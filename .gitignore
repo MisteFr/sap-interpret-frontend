@@ -8,7 +8,6 @@ __pycache__/
 
 # Large binary data generated during experiments
 *.npz
-*.png
 
 # Secondary data directory (kept locally, not in version control)
 data2/
