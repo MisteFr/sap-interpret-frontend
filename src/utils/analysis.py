@@ -1,6 +1,16 @@
 import numpy as np
 import pandas as pd
 import torch
+import re
+
+def clean_text(input_text):
+    """Remove unwanted characters like 'Ċ', 'Ġ' and extra spaces from the text."""
+    if input_text is None:
+        return ""
+    # Remove special tokenizer characters and normalize spaces
+    cleaned = input_text.replace('Ġ', '').replace('Ċ', '')
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
 
 def get_top_features_for_latent(activations, latent_idx, top_k=5, ascending=False):
     """Get samples with highest or lowest activations for a latent dimension.
@@ -31,7 +41,7 @@ def get_top_features_for_latent(activations, latent_idx, top_k=5, ascending=Fals
     
     return top_indices, top_activations
 
-def get_top_violations_for_edge(violations, edge_idx, top_k=5, ascending=False):
+def get_top_violations_for_edge(violations, edge_idx, top_k=5, ascending=False, original_texts=None):
     """Get samples with highest or lowest violation scores for an edge.
     
     Args:
@@ -40,20 +50,43 @@ def get_top_violations_for_edge(violations, edge_idx, top_k=5, ascending=False):
         top_k (int): Number of top samples to return
         ascending (bool): If True, returns samples with lowest violations
                          If False (default), returns samples with highest violations
+        original_texts (list): List of original texts to use for deduplication
     
     Returns:
         tuple: (indices, violation_scores) of the top samples
     """
     edge_violations = violations[:, edge_idx]
     
+    # Get more samples initially to ensure we have enough unique ones
+    initial_k = top_k * 4 if original_texts is not None else top_k
+    
     if ascending:
-        top_indices = np.argsort(edge_violations)[:top_k]
+        top_indices = np.argsort(edge_violations)[:initial_k]
     else:
-        top_indices = np.argsort(edge_violations)[-top_k:][::-1]
+        top_indices = np.argsort(edge_violations)[-initial_k:][::-1]
         
     top_violation_scores = edge_violations[top_indices]
     
-    return top_indices, top_violation_scores
+    # If no original texts provided, return all samples
+    if original_texts is None:
+        return top_indices, top_violation_scores
+    
+    # Deduplicate based on cleaned text
+    unique_indices = []
+    unique_scores = []
+    seen_texts = set()
+    
+    for idx, score in zip(top_indices, top_violation_scores):
+        if idx < len(original_texts):
+            text = clean_text(original_texts[idx])
+            if text not in seen_texts:
+                seen_texts.add(text)
+                unique_indices.append(idx)
+                unique_scores.append(score)
+                if len(unique_indices) >= top_k:
+                    break
+    
+    return np.array(unique_indices), np.array(unique_scores)
 
 def get_edge_violation_stats(violations):
     """Calculate violation statistics for each edge."""
@@ -198,3 +231,89 @@ def process_sample_token_activations(token_data, token_activations, sample_idx, 
         import traceback
         traceback.print_exc()
         return None, None
+
+def get_token_associations(token_data, token_violations, target_token, edge_idx, n_associations=5, max_samples=1000):
+    """Calculate the most associated next and previous tokens for a given token in the context of edge violations.
+    
+    Args:
+        token_data: List of tokenized samples
+        token_violations: Token-level violation scores
+        target_token: The token to find associations for
+        edge_idx: Index of the edge to analyze
+        n_associations: Number of top associations to return
+        max_samples: Maximum number of samples to process to prevent memory growth
+    
+    Returns:
+        tuple: (top_next_tokens, top_prev_tokens) where each is a list of (token, count) tuples
+    """
+    if not target_token or not isinstance(target_token, str):
+        return [], []
+        
+    target_token = clean_text(target_token)
+    if not target_token:
+        return [], []
+    
+    # First pass: quickly scan all samples to find ones containing our target token
+    relevant_indices = []
+    for idx, tokens in enumerate(token_data):
+        if tokens is not None and any(clean_text(t) == target_token for t in tokens):
+            relevant_indices.append(idx)
+    
+    # If we have too many relevant samples, randomly sample from them
+    if len(relevant_indices) > max_samples:
+        # Shuffle the indices and take the first max_samples
+        relevant_indices = list(np.random.permutation(relevant_indices)[:max_samples])
+    
+    # Use dictionaries with size limits to prevent unbounded growth    
+    next_token_counts = {}
+    prev_token_counts = {}
+    max_dict_size = max(n_associations * 20, 100)  # Increased buffer for more complete collection
+    
+    # Process only the relevant samples
+    for sample_idx in relevant_indices:
+        sample_tokens, sample_edge_violations = process_sample_token_violations(
+            token_data, token_violations, sample_idx, edge_idx
+        )
+        
+        if sample_tokens is None or sample_edge_violations is None:
+            continue
+        
+        # Find all occurrences of the target token in this sample
+        for i, token in enumerate(sample_tokens):
+            if not token or not isinstance(token, str):
+                continue
+                
+            if clean_text(token) == target_token:
+                # Process next tokens (can be multiple)
+                for j in range(1, min(3, len(sample_tokens) - i)):  # Look at next 2 tokens
+                    if i + j < len(sample_tokens):
+                        next_token = clean_text(sample_tokens[i + j])
+                        if next_token:
+                            next_token_counts[next_token] = next_token_counts.get(next_token, 0) + (3-j)  # Weight closer tokens higher
+                
+                # Process previous tokens (can be multiple)
+                for j in range(1, min(3, i + 1)):  # Look at previous 2 tokens
+                    if i - j >= 0:
+                        prev_token = clean_text(sample_tokens[i - j])
+                        if prev_token:
+                            prev_token_counts[prev_token] = prev_token_counts.get(prev_token, 0) + (3-j)  # Weight closer tokens higher
+                
+                # Prune dictionaries if they get too large
+                if len(next_token_counts) > max_dict_size:
+                    next_token_counts = dict(sorted(next_token_counts.items(), 
+                                                  key=lambda x: x[1], 
+                                                  reverse=True)[:max_dict_size])
+                if len(prev_token_counts) > max_dict_size:
+                    prev_token_counts = dict(sorted(prev_token_counts.items(), 
+                                                  key=lambda x: x[1], 
+                                                  reverse=True)[:max_dict_size])
+    
+    # Get final top associations
+    top_next = sorted(next_token_counts.items(), key=lambda x: x[1], reverse=True)[:n_associations]
+    top_prev = sorted(prev_token_counts.items(), key=lambda x: x[1], reverse=True)[:n_associations]
+    
+    # Clear dictionaries to help with memory
+    next_token_counts.clear()
+    prev_token_counts.clear()
+    
+    return top_next, top_prev

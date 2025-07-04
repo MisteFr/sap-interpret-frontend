@@ -6,6 +6,40 @@ from visualization.edge_inspector import display_edge_inspector
 from visualization.token_analyzer import display_token_analyzer
 from visualization.latent_token_analyzer import display_latent_token_analyzer
 from visualization.sample_edge_analyzer import display_sample_edge_analyzer
+from visualization.edge_correlation_analyzer import display_edge_correlation_analyzer
+
+def get_available_data_files():
+    """Detect available data files in the data directory."""
+    data_dir = "./data"
+    available_files = {
+        'latent_token': [],
+        'latent': [],
+        'token': [],
+        'edge': []
+    }
+    
+    # Look for all directories
+    for item in os.listdir(data_dir):
+        if os.path.isdir(os.path.join(data_dir, item)):
+            dir_path = os.path.join(data_dir, item)
+            for file in os.listdir(dir_path):
+                if file.endswith('.npz'):
+                    if 'token_level_activations' in file:
+                        available_files['latent_token'].append(os.path.join(dir_path, file))
+                    elif 'sae_activations' in file:
+                        available_files['latent'].append(os.path.join(dir_path, file))
+                    elif 'token_level_violations' in file:
+                        available_files['token'].append(os.path.join(dir_path, file))
+                    elif 'edge_violations' in file:
+                        available_files['edge'].append(os.path.join(dir_path, file))
+    
+    return available_files
+
+def format_file_option(filepath):
+    """Format the filepath to show filename (folder_name)"""
+    filename = os.path.basename(filepath)
+    folder_name = os.path.basename(os.path.dirname(filepath))
+    return f"{filename} ({folder_name})"
 
 def main():
     st.set_page_config(
@@ -51,19 +85,56 @@ def main():
         index=0
     )
     
-    tabs = st.tabs(["Explorer", "Token Analysis", "Sample Edge Analysis", "Settings"])
+    tabs = st.tabs(["Explorer", "Token Analysis", "Sample Edge Analysis", "Edge Correlation", "Settings"])
     
-    with tabs[3]:  # Settings tab
+    with tabs[4]:  # Settings tab
         st.header("Data Settings")
-        # latent_token_file = st.text_input("Path to token-level activations (.npz) file", "./data/test_token_level_activations.npz")
-        # latent_file = st.text_input("Path to latent activations (.npz) file", "./data/test_sae_activations.npz")
-        # token_file = st.text_input("Path to token-level violations (.npz) file", "./data/token_level_violations.npz")
-        latent_token_file = st.text_input("Path to token-level activations (.npz) file", "./data/token_level_activations.npz")
-        latent_file = st.text_input("Path to latent activations (.npz) file", "./data/sae_activations.npz")
-        token_file = st.text_input("Path to token-level violations (.npz) file", "./data/token_level_violations.npz")
         
+        # Get available files
+        available_files = get_available_data_files()
         
-        edge_file = st.text_input("Path to edge violations (.npz) file", "./data/edge_violations.npz")
+        # Create dropdowns for file selection
+        if mode == "Latent Inspection":
+            if available_files['latent_token']:
+                latent_token_file = st.selectbox(
+                    "Select token-level activations file",
+                    available_files['latent_token'],
+                    format_func=format_file_option
+                )
+            else:
+                st.warning("No token-level activation files found")
+                latent_token_file = None
+                
+            if available_files['latent']:
+                latent_file = st.selectbox(
+                    "Select latent activations file",
+                    available_files['latent'],
+                    format_func=format_file_option
+                )
+            else:
+                st.warning("No latent activation files found")
+                latent_file = None
+        else:  # Edge Violation mode
+            if available_files['token']:
+                token_file = st.selectbox(
+                    "Select token-level violations file",
+                    available_files['token'],
+                    format_func=format_file_option
+                )
+            else:
+                st.warning("No token-level violation files found")
+                token_file = None
+                
+            if available_files['edge']:
+                edge_file = st.selectbox(
+                    "Select edge violations file",
+                    available_files['edge'],
+                    format_func=format_file_option
+                )
+            else:
+                st.warning("No edge violation files found")
+                edge_file = None
+        
         model_path = st.text_input("Path or identifier for tokenizer", "mistralai/Ministral-8B-Instruct-2410")
     
     if mode == "Latent Inspection":
@@ -73,8 +144,8 @@ def main():
         file_to_use = edge_file
         data_type = "edge"
         
-    if not os.path.exists(file_to_use):
-        st.error(f"The file '{file_to_use}' does not exist. Please provide a valid file path in the Settings tab.")
+    if not file_to_use or not os.path.exists(file_to_use):
+        st.error(f"Please select a valid {data_type} data file in the Settings tab.")
         return
 
     data_array, original_texts = load_data(file_to_use, data_type=data_type)
@@ -89,21 +160,26 @@ def main():
     latent_token_data, latent_token_activations = None, None
     
     if mode == "Edge Violation Inspection":
-        edge_token_data, edge_token_violations, token_texts = load_token_level_data(token_file, data_type="edge")
-        has_token_data = edge_token_data is not None
+        if token_file and os.path.exists(token_file):
+            edge_token_data, edge_token_violations, token_texts = load_token_level_data(token_file, data_type="edge")
+            has_token_data = edge_token_data is not None
 
-        if has_token_data:
-            st.sidebar.success(f"Token-level violation data loaded from {token_file}")
+            if has_token_data:
+                st.sidebar.success(f"Token-level violation data loaded from {os.path.basename(token_file)}")
+            else:
+                st.sidebar.info("No token-level violation data loaded.")
         else:
-            st.sidebar.info("No token-level violation data loaded.")
+            st.sidebar.info("No token-level violation data file selected.")
     else:  # Latent Inspection mode
-        if os.path.exists(latent_token_file):
+        if latent_token_file and os.path.exists(latent_token_file):
             latent_token_data, latent_token_activations, token_texts = load_token_level_data(latent_token_file, data_type="latent")
             has_latent_token_data = latent_token_data is not None
             if has_latent_token_data:
-                st.sidebar.success(f"Token-level activation data loaded from {latent_token_file}")
+                st.sidebar.success(f"Token-level activation data loaded from {os.path.basename(latent_token_file)}")
             else:
                 st.sidebar.info("No token-level activation data loaded.")
+        else:
+            st.sidebar.info("No token-level activation data file selected.")
     
     st.sidebar.write(f"Dataset contains {data_array.shape[0]} samples")
     if original_texts is not None:
@@ -158,6 +234,15 @@ def main():
                 )
         else:
             st.info("Sample edge analysis is only available in Edge Violation Inspection mode.")
+
+    with tabs[3]:  # Edge Correlation tab
+        if mode == "Edge Violation Inspection":
+            if data_array is None:
+                st.warning("No edge violation data loaded.")
+            else:
+                display_edge_correlation_analyzer(data_array)
+        else:
+            st.info("Edge correlation analysis is only available in Edge Violation Inspection mode.")
 
 if __name__ == "__main__":
     main() 

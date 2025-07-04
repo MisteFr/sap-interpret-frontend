@@ -1,13 +1,124 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from utils.analysis import get_top_violations_for_edge, get_edge_violation_stats, process_sample_token_violations
+from utils.analysis import get_top_violations_for_edge, get_edge_violation_stats, process_sample_token_violations, get_token_associations
 from utils.text_processing import extract_relevant_text, clean_text, clean_token
 from visualization.plotting import create_violation_histogram, create_colored_token_html
 import plotly.express as px
+import html
+
+def inject_token_tooltip_style():
+    """Inject the CSS style for token tooltips."""
+    st.markdown("""
+        <style>
+            .token-row {
+                display: flex;
+                align-items: center;
+                position: relative;
+                margin-bottom: 5px;
+                width: 100%;
+            }
+            .token-info-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 12px;
+                margin-left: 8px;
+                cursor: help;
+                border: none;
+                position: relative;
+                z-index: 1;
+            }
+            .token-info-container {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+            }
+            .token-info-container:hover .token-tooltip {
+                opacity: 1;
+                visibility: visible;
+                transform: translate(8px, -50%);
+            }
+            .token-tooltip {
+                position: absolute;
+                left: 100%;
+                top: 50%;
+                transform: translate(0, -50%);
+                background: #1e1e1e;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 12px;
+                width: 280px;
+                z-index: 1000;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.2s ease;
+                pointer-events: none;
+            }
+            .token-tooltip.visible {
+                opacity: 1;
+                visibility: visible;
+                pointer-events: auto;
+            }
+            .token-section {
+                margin-bottom: 12px;
+            }
+            .token-section:last-child {
+                margin-bottom: 0;
+            }
+            .section-title {
+                font-weight: bold;
+                color: rgba(255, 255, 255, 0.9);
+                margin-bottom: 6px;
+                font-size: 0.9em;
+            }
+            .token-list {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                max-height: 150px;
+                overflow-y: auto;
+            }
+            .token-list::-webkit-scrollbar {
+                width: 6px;
+            }
+            .token-list::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.05);
+            }
+            .token-list::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 3px;
+            }
+            .token-item {
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 0.9em;
+                padding: 4px 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 4px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .token-main {
+                background-color: rgba(255, 100, 100, 0.3);
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 0.95em;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
 def display_edge_inspector(data_array, original_texts, token_data=None, token_violations=None):
     """Display the edge violation inspector UI."""
+    # Always inject the tooltip style first
+    inject_token_tooltip_style()
+    
     st.markdown(
         """
         This interface lets you explore edge violations by selecting an edge 
@@ -155,14 +266,22 @@ def display_edge_inspector(data_array, original_texts, token_data=None, token_vi
             token_avg_violations[token] /= token_counts[token]
         
         filtered_tokens = {token: value for token, value in token_avg_violations.items() 
-                          if token_counts.get(token, 0) >= 20}
+                          if token_counts.get(token, 0) >= 50}
         
         sorted_tokens = sorted(filtered_tokens.items(), key=lambda x: x[1])
         
-        display_count = 15
+        # Add sliders for controlling display parameters
+        with st.sidebar:
+            with st.expander("⚙️ Display Settings", expanded=False):
+                display_count = st.slider("Number of tokens to display", min_value=10, max_value=500, value=1, step=5)
+                min_token_freq = st.slider("Minimum token frequency", min_value=0, max_value=200, value=50, step=1)
+                
+                # Update filtered tokens based on new frequency threshold
+                filtered_tokens = {token: value for token, value in token_avg_violations.items() 
+                                 if token_counts.get(token, 0) >= min_token_freq}
+                sorted_tokens = sorted(filtered_tokens.items(), key=lambda x: x[1])
         
         top_negative = sorted_tokens[:min(display_count, len(sorted_tokens)//2)]
-        
         top_positive = sorted_tokens[max(len(sorted_tokens)-display_count, len(sorted_tokens)//2):][::-1]
         
         with neg_col:
@@ -181,29 +300,99 @@ def display_edge_inspector(data_array, original_texts, token_data=None, token_vi
                 )
         
         with pos_col:
+            # Reset token display state when edge changes
+            current_edge_key = f"edge_{edge_idx}"
+            if 'last_edge_key' not in st.session_state or st.session_state.last_edge_key != current_edge_key:
+                st.session_state.last_edge_key = current_edge_key
+                if 'token_states' in st.session_state:
+                    del st.session_state.token_states
+            
             st.markdown(f"# Positive Logits")
-            for token, value in top_positive:
-                if value > 0:  # Only display positive values
-                    count = token_counts.get(token, 0)
-                    st.markdown(
-                        f"""<div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span style="background-color: rgba(255, 100, 100, 0.3); padding: 2px 8px; border-radius: 4px;">{token}</span>
-                            <span style="display: flex; gap: 10px;">
-                                <span title="Frequency">{count}×</span>
-                                <span>{value:.2f}</span>
-                            </span>
-                        </div>""",
-                        unsafe_allow_html=True
-                    )
-    
+            
+            # Process tokens in batches to prevent memory issues
+            batch_size = 10
+            for batch_start in range(0, len(top_positive), batch_size):
+                batch_end = min(batch_start + batch_size, len(top_positive))
+                batch = top_positive[batch_start:batch_end]
+                
+                for token_idx, (token, value) in enumerate(batch, start=batch_start):
+                    if value > 0:  # Only display positive values
+                        count = token_counts.get(token, 0)
+                        
+                        # Create unique key for this token in this edge
+                        token_key = f"{current_edge_key}_{token_idx}"
+                        
+                        # Get token associations with limited sample size
+                        top_next, top_prev = get_token_associations(
+                            token_data, 
+                            token_violations, 
+                            token, 
+                            edge_idx,
+                            n_associations=5,
+                            max_samples=1000
+                        )
+                        
+                        # Only show non-empty associations
+                        if top_next or top_prev:
+                            # Create the tooltip content with proper HTML escaping
+                            prev_tokens_html = "".join([
+                                f'<div class="token-item">{html.escape(str(t))} ({c}×)</div>'
+                                for t, c in top_prev
+                            ]) or '<div class="token-item">No frequent previous tokens found</div>'
+                            
+                            next_tokens_html = "".join([
+                                f'<div class="token-item">{html.escape(str(t))} ({c}×)</div>'
+                                for t, c in top_next
+                            ]) or '<div class="token-item">No frequent next tokens found</div>'
+                            
+                            col1, col2 = st.columns([4, 1], gap="small")
+                            with col1:
+                                with st.container():
+                                    st.markdown(
+                                        f"""<div class="token-row" id="row_{token_key}">
+                                            <span class="token-main">{html.escape(str(token))}</span>
+                                            <div class="token-info-container">
+                                                <button class="token-info-btn" id="btn_{token_key}">i</button>
+                                                <div class="token-tooltip" id="tooltip_{token_key}">
+                                                    <div class="token-section">
+                                                        <div class="section-title">Previous tokens:</div>
+                                                        <div class="token-list">
+                                                            {prev_tokens_html}
+                                                        </div>
+                                                    </div>
+                                                    <div class="token-section">
+                                                        <div class="section-title">Next tokens:</div>
+                                                        <div class="token-list">
+                                                            {next_tokens_html}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>""",
+                                        unsafe_allow_html=True
+                                    )
+                            with col2:
+                                with st.container():
+                                    st.markdown(
+                                        f"""<div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                            <span title="Frequency">{count}×</span>
+                                            <span>{value:.2f}</span>
+                                        </div>""",
+                                        unsafe_allow_html=True
+                                    )
+                
+                # Force garbage collection after each batch
+                import gc
+                gc.collect()
     
     top_k = st.number_input("Number of top violating samples to display", min_value=1, max_value=20, value=5, step=1)
     
-    top_indices, top_violations = get_top_violations_for_edge(data_array, edge_idx, top_k)
-    
+    # Get unique top violating samples
+    top_indices, top_violations = get_top_violations_for_edge(data_array, edge_idx, top_k, original_texts=original_texts)
     st.session_state['top_violation_indices'] = top_indices
     
-    bottom_indices, bottom_violations = get_top_violations_for_edge(data_array, edge_idx, top_k, ascending=True)
+    # Get unique bottom violating samples
+    bottom_indices, bottom_violations = get_top_violations_for_edge(data_array, edge_idx, top_k, ascending=True, original_texts=original_texts)
     
     positive_violations = data_array[:, edge_idx] > 0
     positive_count = np.sum(positive_violations)

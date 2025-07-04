@@ -2,3 +2,17 @@ data/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# macOS Finder artifacts
+.DS_Store
+
+# Large binary data generated during experiments
+*.npz
+*.png
+
+# Secondary data directory (kept locally, not in version control)
+data2/
+
+# Streamlit & IPython temp files
+*.cache/
+.ipynb_checkpoints/

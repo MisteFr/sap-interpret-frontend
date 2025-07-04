@@ -1,6 +1,0 @@
-
-
-python visualize_latent_stats.py --stats_dir precomputed_stats --output_dir visualization_results
-
-
-/usr/local/bin/python "/Users/arthur/Documents/Documents - macArthur/ETHZ/Semester Project/sap/sap-interpret-frontend/src/scripts/precompute_edge_stats.py" --data_file '/Users/arthur/Documents/Documents - macArthur/ETHZ/Semester Project/sap/sap-interpret-frontend/data/edge_violations.npz' --data_type edge --token_data_file '/Users/arthur/Documents/Documents - macArthur/ETHZ/Semester Project/sap/sap-interpret-frontend/data/token_level_violations.npz' --token_data_type edge --output_dir '/Users/arthur/Documents/Documents - macArthur/ETHZ/Semester Project/sap/sap-interpret-frontend/data'
