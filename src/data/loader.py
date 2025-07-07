@@ -35,9 +35,11 @@ def load_data(npz_path: str, data_type: str):
     
     return array_data, original_texts
 
-def load_tokenizer(model_path):
-    """Load a tokenizer from the given model path."""
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+def load_tokenizer(model_path: str):
+    """Load a tokenizer from the given model path, using the `HF_TOKEN` if available."""
+    token = os.getenv("HF_TOKEN")
+
+    tokenizer = AutoTokenizer.from_pretrained(model_path, use_auth_token=token)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
@@ -177,4 +179,11 @@ def _hf_resolve(path: str) -> str:
             f"dataset file '{path}'."
         )
 
-    return hf_hub_download(repo_id=repo_id, filename=path, repo_type="dataset") 
+    token = os.getenv("HF_TOKEN")  # single canonical env var for auth
+
+    return hf_hub_download(
+        repo_id=repo_id,
+        filename=path,
+        repo_type="dataset",
+        token=token,
+    ) 
