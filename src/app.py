@@ -7,41 +7,40 @@ from visualization.token_analyzer import display_token_analyzer
 from visualization.latent_token_analyzer import display_latent_token_analyzer
 from visualization.sample_edge_analyzer import display_sample_edge_analyzer
 from visualization.edge_correlation_analyzer import display_edge_correlation_analyzer
+from huggingface_hub import HfApi
 
 def get_available_data_files():
-    """Detect available data files in the data directory."""
-    data_dir = "./data"
+    """List available .npz data files from the Hugging Face dataset repo defined by `HF_DATASET_REPO`."""
+    repo_id = os.getenv("HF_DATASET_REPO")
+
+    if not repo_id:
+        st.error("Environment variable `HF_DATASET_REPO` is not set — the app cannot list data files.")
+        return {k: [] for k in ['latent_token', 'latent', 'token', 'edge']}
+
+    api = HfApi()
+    try:
+        files = api.list_repo_files(repo_id, repo_type="dataset")
+    except Exception as exc:
+        st.error(f"Could not list files in Hugging Face dataset `{repo_id}`: {exc}")
+        return {k: [] for k in ['latent_token', 'latent', 'token', 'edge']}
+
     available_files = {
-        'latent_token': [],
-        'latent': [],
-        'token': [],
-        'edge': []
+        'latent_token': [f for f in files if f.endswith('.npz') and 'token_level_activations' in f],
+        'latent': [f for f in files if f.endswith('.npz') and 'sae_activations' in f],
+        'token': [f for f in files if f.endswith('.npz') and 'token_level_violations' in f],
+        'edge': [f for f in files if f.endswith('.npz') and 'edge_violations' in f],
     }
-    
-    # Look for all directories
-    for item in os.listdir(data_dir):
-        if os.path.isdir(os.path.join(data_dir, item)):
-            dir_path = os.path.join(data_dir, item)
-            for file in os.listdir(dir_path):
-                if file.endswith('.npz'):
-                    if 'token_level_activations' in file:
-                        available_files['latent_token'].append(os.path.join(dir_path, file))
-                    elif 'sae_activations' in file:
-                        available_files['latent'].append(os.path.join(dir_path, file))
-                    elif 'token_level_violations' in file:
-                        available_files['token'].append(os.path.join(dir_path, file))
-                    elif 'edge_violations' in file:
-                        available_files['edge'].append(os.path.join(dir_path, file))
-    
     return available_files
 
 def format_file_option(filepath):
-    """Format the filepath to show filename (folder_name)"""
+    """Format file option for display."""
     filename = os.path.basename(filepath)
-    folder_name = os.path.basename(os.path.dirname(filepath))
-    return f"{filename} ({folder_name})"
+    parent = os.path.dirname(filepath)
+    return f"{filename} ({parent})" if parent else filename
 
 def main():
+    # We no longer pre-download the entire dataset; individual files are fetched on-demand.
+    
     st.set_page_config(
         page_title="Latent Space & Edge Violations Explorer",
         layout="wide",
@@ -144,8 +143,8 @@ def main():
         file_to_use = edge_file
         data_type = "edge"
         
-    if not file_to_use or not os.path.exists(file_to_use):
-        st.error(f"Please select a valid {data_type} data file in the Settings tab.")
+    if not file_to_use:
+        st.error(f"Please select a {data_type} data file in the Settings tab.")
         return
 
     data_array, original_texts = load_data(file_to_use, data_type=data_type)
@@ -160,7 +159,7 @@ def main():
     latent_token_data, latent_token_activations = None, None
     
     if mode == "Edge Violation Inspection":
-        if token_file and os.path.exists(token_file):
+        if token_file:
             edge_token_data, edge_token_violations, token_texts = load_token_level_data(token_file, data_type="edge")
             has_token_data = edge_token_data is not None
 
@@ -171,7 +170,7 @@ def main():
         else:
             st.sidebar.info("No token-level violation data file selected.")
     else:  # Latent Inspection mode
-        if latent_token_file and os.path.exists(latent_token_file):
+        if latent_token_file:
             latent_token_data, latent_token_activations, token_texts = load_token_level_data(latent_token_file, data_type="latent")
             has_latent_token_data = latent_token_data is not None
             if has_latent_token_data:
