@@ -152,9 +152,9 @@ def main():
     if data_array is None:
         st.error(f"Could not load {data_type} data from {file_to_use}.")
         return
-        
-    tokenizer = load_tokenizer(model_path)
-    
+
+    # tokenizer = load_tokenizer(model_path)
+
     edge_token_data, edge_token_violations, token_texts = None, None, None
     latent_token_data, latent_token_activations = None, None
     
@@ -228,8 +228,7 @@ def main():
             else:
                 display_sample_edge_analyzer(
                     data_array,
-                    original_texts,
-                    tokenizer
+                    original_texts
                 )
         else:
             st.info("Sample edge analysis is only available in Edge Violation Inspection mode.")
