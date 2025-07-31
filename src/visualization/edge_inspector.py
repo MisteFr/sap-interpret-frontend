@@ -273,7 +273,7 @@ def display_edge_inspector(data_array, original_texts, token_data=None, token_vi
         # Add sliders for controlling display parameters
         with st.sidebar:
             with st.expander("⚙️ Display Settings", expanded=False):
-                display_count = st.slider("Number of tokens to display", min_value=10, max_value=500, value=1, step=5)
+                display_count = st.slider("Number of tokens to display", min_value=1, max_value=50, value=15, step=5)
                 min_token_freq = st.slider("Minimum token frequency", min_value=0, max_value=200, value=50, step=1)
                 
                 # Update filtered tokens based on new frequency threshold

@@ -35,8 +35,10 @@ def display_latent_inspector(data_array, original_texts, token_data=None, token_
             display_df['mean_activation'] = display_df['mean_activation'].round(3)
             
             display_df.columns = ['Latent', 'Activation', '% of Samples', 'Max Score', 'Mean Score']
+            # Remove the default numeric index so it doesn't appear as an unnamed column
+            display_df = display_df.reset_index(drop=True)
             
-            st.dataframe(display_df)
+            st.dataframe(display_df, hide_index=True)
             
             min_latent = int(display_df['Latent'].min())
             max_latent = int(display_df['Latent'].max())

@@ -35,6 +35,44 @@ def get_available_data_files():
     
     return available_files
 
+# -----------------------------------------------------------------------------
+# Pre-load datasets into Streamlit's cache at server start
+# -----------------------------------------------------------------------------
+
+# Caching this function ensures it executes only once (per server lifetime). It
+# eagerly loads every dataset found in ./data into the existing cache helpers
+# so that later calls to `load_data` / `load_token_level_data` return instantly.
+
+@st.cache_resource(show_spinner=False)
+def _preload_all_datasets():
+    """Eagerly load all .npz datasets so the first user doesn't wait."""
+
+    available = get_available_data_files()
+
+    # Latent and edge-level arrays ------------------------------------------------
+    for path in available.get("latent", []):
+        load_data(path, data_type="latent")
+
+    for path in available.get("edge", []):
+        load_data(path, data_type="edge")
+
+    # Token-level data ------------------------------------------------------------
+    for path in available.get("latent_token", []):
+        load_token_level_data(path, data_type="latent")
+
+    for path in available.get("token", []):
+        load_token_level_data(path, data_type="edge")
+
+    # Return a trivial value so Streamlit keeps the resource around
+    return True
+
+
+# Kick off the preload process immediately when the module is imported. Because
+# the function above is cached as a resource, the heavy work is performed only
+# once, during server start-up, and subsequent script re-runs reuse the cache.
+
+_ = _preload_all_datasets()
+
 def format_file_option(filepath):
     """Format the filepath to show filename (folder_name)"""
     filename = os.path.basename(filepath)
@@ -82,7 +120,7 @@ def main():
     mode = st.sidebar.radio(
         "Exploration Mode", 
         ["Latent Inspection", "Edge Violation Inspection"],
-        index=0
+        index=1
     )
     
     tabs = st.tabs(["Explorer", "Token Analysis", "Sample Edge Analysis", "Edge Correlation", "Settings"])

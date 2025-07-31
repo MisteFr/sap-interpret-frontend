@@ -1,13 +1,15 @@
 import os
 import numpy as np
 from transformers import AutoTokenizer
+import streamlit as st
 
+@st.cache_data(show_spinner=False)
 def load_data(npz_path, data_type):
     """Load data from an .npz file based on the specified data type."""
     if not os.path.exists(npz_path):
         return None, None
         
-    data = np.load(npz_path, allow_pickle=True)
+    data = np.load(npz_path, allow_pickle=True, mmap_mode='r')
     
     if data_type == "latent":
         if "activations" not in data:
@@ -34,6 +36,7 @@ def load_data(npz_path, data_type):
     
     return array_data, original_texts
 
+@st.cache_resource(show_spinner=False)
 def load_tokenizer(model_path):
     """Load a tokenizer from the given model path."""
     tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -45,6 +48,7 @@ def load_tokenizer(model_path):
     
     return tokenizer
 
+@st.cache_data(show_spinner=False)
 def load_token_level_data(file_path, data_type="edge"):
     """
     Load token-level data from an .npz file.
@@ -62,7 +66,7 @@ def load_token_level_data(file_path, data_type="edge"):
         if not os.path.exists(file_path):
             return None, None, None
             
-        loaded = np.load(file_path, allow_pickle=True)
+        loaded = np.load(file_path, allow_pickle=True, mmap_mode='r')
         
         token_data = loaded.get('tokens', None)
         token_texts = loaded.get('texts', None)

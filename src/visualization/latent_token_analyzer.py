@@ -13,14 +13,23 @@ def display_latent_token_analyzer(token_data, token_activations, token_texts=Non
     
     st.subheader(f"Analyzing Latent Dimension {latent_display}")
     
-    default_idx = st.session_state.get('selected_sample_idx', 
-                                     st.session_state.get('top_activation_indices', [0])[0] 
-                                     if len(st.session_state.get('top_activation_indices', [])) > 0 else 0)
-    
-    sample_idx = st.number_input("Select sample index to explore", 
-                                 min_value=0, 
-                                 max_value=len(token_data)-1 if token_data is not None else 0, 
-                                 value=default_idx)
+    default_idx = st.session_state.get(
+        'selected_sample_idx',
+        st.session_state.get('top_activation_indices', [0])[0]
+        if len(st.session_state.get('top_activation_indices', [])) > 0 else 0
+    )
+
+    max_idx = len(token_data) - 1 if token_data is not None else 0
+    if default_idx > max_idx:
+        default_idx = max_idx
+
+    sample_idx = st.number_input(
+        "Select sample index to explore",
+        min_value=0,
+        max_value=max_idx,
+        value=default_idx,
+        key="sample_idx_input"
+    )
     
     if sample_idx < len(token_data):
         st.markdown("**Sample text:**")

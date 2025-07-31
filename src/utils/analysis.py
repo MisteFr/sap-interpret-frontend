@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 import re
+import streamlit as st
 
 def clean_text(input_text):
     """Remove unwanted characters like 'Ċ', 'Ġ' and extra spaces from the text."""
@@ -88,63 +89,51 @@ def get_top_violations_for_edge(violations, edge_idx, top_k=5, ascending=False, 
     
     return np.array(unique_indices), np.array(unique_scores)
 
+@st.cache_data(show_spinner=False)
 def get_edge_violation_stats(violations):
-    """Calculate violation statistics for each edge."""
-    n_samples, n_edges = violations.shape
-    stats = []
-    
-    for edge_idx in range(n_edges):
-        edge_data = violations[:, edge_idx]
-        positive_violations = np.sum(edge_data > 0)
-        max_violation = np.max(edge_data)
-        mean_violation = np.mean(edge_data)
-        
-        stats.append({
-            'edge': edge_idx + 1,
-            'violation_count': positive_violations,
-            'violation_percentage': (positive_violations / n_samples) * 100,
-            'max_violation': max_violation,
-            'mean_violation': mean_violation
-        })
-    
-    return pd.DataFrame(stats)
+    """Calculate violation statistics for each edge using vectorized operations for efficiency."""
+    if violations is None or violations.size == 0:
+        return pd.DataFrame()
 
+    n_samples = violations.shape[0]
+    positive_counts = np.sum(violations > 0, axis=0)
+    max_violations = np.max(violations, axis=0)
+    mean_violations = np.mean(violations, axis=0)
+
+    edges = np.arange(1, violations.shape[1] + 1)
+
+    return pd.DataFrame({
+        'edge': edges,
+        'violation_count': positive_counts,
+        'violation_percentage': (positive_counts / n_samples) * 100,
+        'max_violation': max_violations,
+        'mean_violation': mean_violations
+    })
+
+@st.cache_data(show_spinner=False)
 def get_latent_activation_stats(activations):
-    """Calculate activation statistics for each latent dimension.
-    
-    Args:
-        activations (np.ndarray): Array of shape (n_samples, n_timesteps, n_latents) 
-            or (n_samples, n_latents)
-    
-    Returns:
-        pd.DataFrame: Statistics for each latent dimension including:
-            - latent: index of the latent dimension (1-based)
-            - activation_count: number of samples with positive activations
-            - activation_percentage: percentage of samples with positive activations
-            - max_activation: maximum activation value
-            - mean_activation: mean activation value
-    """
+    """Calculate activation statistics for each latent dimension using vectorized operations."""
+    if activations is None or activations.size == 0:
+        return pd.DataFrame()
+
+    # If activations are 3-D (samples, timesteps, latents) take max over timesteps first
     if len(activations.shape) == 3:
         activations = np.max(activations, axis=1)
-    
-    n_samples, n_latents = activations.shape
-    stats = []
-    
-    for latent_idx in range(n_latents):
-        latent_data = activations[:, latent_idx]
-        positive_activations = np.sum(latent_data > 0)
-        max_activation = np.max(latent_data)
-        mean_activation = np.mean(latent_data)
-        
-        stats.append({
-            'latent': latent_idx + 1,
-            'activation_count': positive_activations,
-            'activation_percentage': (positive_activations / n_samples) * 100,
-            'max_activation': max_activation,
-            'mean_activation': mean_activation
-        })
-    
-    return pd.DataFrame(stats)
+
+    n_samples = activations.shape[0]
+    positive_counts = np.sum(activations > 0, axis=0)
+    max_activations = np.max(activations, axis=0)
+    mean_activations = np.mean(activations, axis=0)
+
+    latents = np.arange(1, activations.shape[1] + 1)
+
+    return pd.DataFrame({
+        'latent': latents,
+        'activation_count': positive_counts,
+        'activation_percentage': (positive_counts / n_samples) * 100,
+        'max_activation': max_activations,
+        'mean_activation': mean_activations
+    })
 
 def process_sample_token_violations(token_data, token_violations, sample_idx, edge_idx):
     """Process token-level violations for a specific sample and edge."""
