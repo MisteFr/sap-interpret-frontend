@@ -6,6 +6,29 @@ from utils.text_processing import extract_relevant_text, clean_text, clean_token
 from visualization.plotting import create_violation_histogram, create_colored_token_html
 import plotly.express as px
 import html
+from collections import defaultdict
+
+# Cache-heavy aggregation so it's computed only once per edge and cached by Streamlit
+@st.cache_data(show_spinner="Aggregating token violation statistics…")
+def _get_edge_token_stats(token_data, token_violations, edge_idx):
+    """Return (avg_dict, count_dict) for the selected edge."""
+    token_sum = defaultdict(float)
+    token_count = defaultdict(int)
+
+    for sample_idx in range(len(token_data)):
+        sample_tokens, sample_edge_violations = process_sample_token_violations(
+            token_data, token_violations, sample_idx, edge_idx
+        )
+        if sample_tokens is None or sample_edge_violations is None:
+            continue
+
+        for tok, v in zip(sample_tokens, sample_edge_violations):
+            tok_clean = clean_token(tok)
+            token_sum[tok_clean] += v
+            token_count[tok_clean] += 1
+
+    token_avg = {t: token_sum[t] / token_count[t] for t in token_sum}
+    return token_avg, token_count
 
 def inject_token_tooltip_style():
     """Inject the CSS style for token tooltips."""
@@ -236,50 +259,21 @@ def display_edge_inspector(data_array, original_texts, token_data=None, token_vi
     
     # Process token data to calculate and display top positive and negative logits
     if token_data is not None and token_violations is not None:
-        # Gather all token violations for this edge
-        all_tokens = []
-        all_token_violations = []
-        
-        # Process all samples to extract token violations for this edge
-        for sample_idx in range(len(token_data)):
-            sample_tokens, sample_edge_violations = process_sample_token_violations(
-                token_data, token_violations, sample_idx, edge_idx
-            )
-            
-            if sample_tokens is not None and sample_edge_violations is not None:
-                all_tokens.extend(sample_tokens)
-                all_token_violations.extend(sample_edge_violations)
-        
-        token_avg_violations = {}
-        token_counts = {}
-        
-        for token, violation in zip(all_tokens, all_token_violations):
-            clean_tok = clean_token(token)
-            if clean_tok not in token_avg_violations:
-                token_avg_violations[clean_tok] = 0
-                token_counts[clean_tok] = 0
-            
-            token_avg_violations[clean_tok] += violation
-            token_counts[clean_tok] += 1
-        
-        for token in token_avg_violations:
-            token_avg_violations[token] /= token_counts[token]
-        
-        filtered_tokens = {token: value for token, value in token_avg_violations.items() 
-                          if token_counts.get(token, 0) >= 50}
-        
-        sorted_tokens = sorted(filtered_tokens.items(), key=lambda x: x[1])
-        
-        # Add sliders for controlling display parameters
+        # Compute token statistics once per edge and reuse them across reruns
+        token_avg_violations, token_counts = _get_edge_token_stats(
+            token_data, token_violations, edge_idx
+        )
+
+        # Sidebar controls
         with st.sidebar:
             with st.expander("Display Settings", expanded=False):
                 display_count = st.slider("Number of tokens to display", min_value=1, max_value=50, value=15, step=5)
                 min_token_freq = st.slider("Minimum token frequency", min_value=0, max_value=200, value=50, step=1)
-                
-                # Update filtered tokens based on new frequency threshold
-                filtered_tokens = {token: value for token, value in token_avg_violations.items() 
-                                 if token_counts.get(token, 0) >= min_token_freq}
-                sorted_tokens = sorted(filtered_tokens.items(), key=lambda x: x[1])
+
+        # Filter & sort after user interaction
+        filtered_tokens = {token: value for token, value in token_avg_violations.items()
+                           if token_counts.get(token, 0) >= min_token_freq}
+        sorted_tokens = sorted(filtered_tokens.items(), key=lambda x: x[1])
         
         top_negative = sorted_tokens[:min(display_count, len(sorted_tokens)//2)]
         top_positive = sorted_tokens[max(len(sorted_tokens)-display_count, len(sorted_tokens)//2):][::-1]

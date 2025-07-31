@@ -98,6 +98,10 @@ def main():
     table {
         font-size: 0.85rem !important;
     }
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    button[data-testid="stToolbarStop"] {display: none !important;}
     /* Make expanders more compact */
     .streamlit-expanderHeader {
         font-size: 0.9rem !important;

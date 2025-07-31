@@ -8,6 +8,28 @@ import numpy as np
 import plotly.express as px
 import os
 import pickle
+from collections import defaultdict
+
+@st.cache_data(show_spinner="Aggregating token activation statistics…")
+def _get_latent_token_stats(token_data, token_activations, latent_idx):
+    """Return (avg_dict, count_dict) for the selected latent dimension."""
+    token_sum = defaultdict(float)
+    token_count = defaultdict(int)
+
+    for sample_idx in range(len(token_data)):
+        sample_tokens, sample_latent_activations = process_sample_token_activations(
+            token_data, token_activations, sample_idx, latent_idx
+        )
+        if sample_tokens is None or sample_latent_activations is None:
+            continue
+
+        for tok, v in zip(sample_tokens, sample_latent_activations):
+            tok_clean = clean_token(tok)
+            token_sum[tok_clean] += v
+            token_count[tok_clean] += 1
+
+    token_avg = {t: token_sum[t] / token_count[t] for t in token_sum}
+    return token_avg, token_count
 
 def display_latent_inspector(data_array, original_texts, token_data=None, token_activations=None, precomputed_dir='basic_stats'):
     """Display the latent space inspector UI."""
@@ -131,42 +153,20 @@ def display_latent_inspector(data_array, original_texts, token_data=None, token_
         st.plotly_chart(fig, use_container_width=True)
 
     if token_data is not None and token_activations is not None:
-        all_tokens = []
-        all_token_activations = []
-        
-        for sample_idx in range(len(token_data)):
-            sample_tokens, sample_latent_activations = process_sample_token_activations(
-                token_data, token_activations, sample_idx, dimension_idx
-            )
-            
-            if sample_tokens is not None and sample_latent_activations is not None:
-                all_tokens.extend(sample_tokens)
-                all_token_activations.extend(sample_latent_activations)
-        
-        token_avg_activations = {}
-        token_counts = {}
-        
-        for token, activation in zip(all_tokens, all_token_activations):
-            clean_tok = clean_token(token)
-            if clean_tok not in token_avg_activations:
-                token_avg_activations[clean_tok] = 0
-                token_counts[clean_tok] = 0
-            
-            token_avg_activations[clean_tok] += activation
-            token_counts[clean_tok] += 1
-        
-        for token in token_avg_activations:
-            token_avg_activations[token] /= token_counts[token]
-        
-        filtered_tokens = {token: value for token, value in token_avg_activations.items() 
+        # Compute token statistics once per latent dimension and reuse across reruns
+        token_avg_activations, token_counts = _get_latent_token_stats(
+            token_data, token_activations, dimension_idx
+        )
+
+        filtered_tokens = {token: value for token, value in token_avg_activations.items()
                           if token_counts.get(token, 0) >= 1}
-        
+
         sorted_tokens = sorted(filtered_tokens.items(), key=lambda x: x[1])
-        
+
         display_count = 10
-        
+
         top_negative = sorted_tokens[:min(display_count, len(sorted_tokens)//2)]
-        
+
         top_positive = sorted_tokens[max(len(sorted_tokens)-display_count, len(sorted_tokens)//2):][::-1]
         
         with neg_col:

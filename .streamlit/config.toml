@@ -1,0 +1,7 @@
+[server]
+headless = true           # run in headless/production mode
+runOnSave = false        # no auto-rerun on file change
+
+[client]
+toolbarMode = "viewer"  # hide Deploy, Rerun, Theme toggle, etc.
+showSidebarNavigation = false  # hide '>' toggle icon 
