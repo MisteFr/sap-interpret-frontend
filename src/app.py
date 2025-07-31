@@ -120,6 +120,24 @@ def main():
     """, unsafe_allow_html=True)
     
     st.title("Latent Space & Edge Violations Explorer")
+
+    # ---------------------------------------------------------------------
+    # Overview / About section (displayed prominently below the main title)
+    # ---------------------------------------------------------------------
+    st.markdown(
+        """
+
+Safety Polytope (SaP) is a geometric safety layer that defines a set of half-space constraints ("facets") in the hidden-state representation space of a language model (see *[Learning Safety Constraints for Large Language Models](https://arxiv.org/abs/2505.24445)* for the technical details).
+
+This dashboard lets you inspect how data from the [BeaverTail](https://huggingface.co/datasets/PKU-Alignment/BeaverTails) terrorism category interacts with those constraints:
+
+• **Latent Dimension Explorer** – browse features of the SaP Concept Encoder and view samples/logits that maximally activate them.  
+• **Facet / Edge Violation Inspector** – identify inputs/logits that violate safety facets and drill down to token level.  
+• **Token-level Heat-maps** – see which tokens contribute most to each violation.
+
+Made as a part of a semester research project by [Arthur Bigot](https://github.com/MisteFr).
+        """
+    )
     
     mode = st.sidebar.radio(
         "Exploration Mode", 
@@ -223,8 +241,6 @@ def main():
             st.sidebar.info("No token-level activation data file selected.")
     
     st.sidebar.write(f"Dataset contains {data_array.shape[0]} samples")
-    if original_texts is not None:
-        st.sidebar.write(f"Original texts available: {len(original_texts)}")
     
     with tabs[0]:  # Explorer tab
         if mode == "Latent Inspection":

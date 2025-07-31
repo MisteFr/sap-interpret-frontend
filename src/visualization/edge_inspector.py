@@ -267,8 +267,8 @@ def display_edge_inspector(data_array, original_texts, token_data=None, token_vi
         # Sidebar controls
         with st.sidebar:
             with st.expander("Display Settings", expanded=False):
-                display_count = st.slider("Number of tokens to display", min_value=1, max_value=50, value=15, step=5)
-                min_token_freq = st.slider("Minimum token frequency", min_value=0, max_value=200, value=50, step=1)
+                display_count = st.slider("Number of tokens to display", min_value=1, max_value=50, value=15, step=1)
+                min_token_freq = st.slider("Minimum token frequency", min_value=1, max_value=200, value=20, step=1)
 
         # Filter & sort after user interaction
         filtered_tokens = {token: value for token, value in token_avg_violations.items()
