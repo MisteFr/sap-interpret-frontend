@@ -6,7 +6,7 @@ import seaborn as sns
 import plotly.graph_objects as go
 import plotly.express as px
 
-def display_sample_edge_analyzer(edge_data, original_texts, tokenizer):
+def display_sample_edge_analyzer(edge_data, original_texts):
     """
     Display a sample-level analyzer for edge violations.
     
