@@ -25,7 +25,7 @@ def display_latent_inspector(data_array, original_texts, token_data=None, token_
     print(data_array.shape)
     
     with st.sidebar:
-        with st.expander("📊 Latents Activation Statistics", expanded=False):
+        with st.expander("Latents Activation Statistics", expanded=False):
             sorted_stats = latents_stats.sort_values('activation_count', ascending=False)
             
             display_df = sorted_stats.copy()

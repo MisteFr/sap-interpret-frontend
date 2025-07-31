@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from data.loader import load_data, load_tokenizer, load_token_level_data
+from data.loader import load_data, load_token_level_data
 from visualization.latent_inspector import display_latent_inspector
 from visualization.edge_inspector import display_edge_inspector
 from visualization.token_analyzer import display_token_analyzer
@@ -173,8 +173,7 @@ def main():
                 st.warning("No edge violation files found")
                 edge_file = None
         
-        model_path = st.text_input("Path or identifier for tokenizer", "mistralai/Ministral-8B-Instruct-2410")
-    
+
     if mode == "Latent Inspection":
         file_to_use = latent_file
         data_type = "latent"
@@ -192,7 +191,7 @@ def main():
         st.error(f"Could not load {data_type} data from {file_to_use}.")
         return
         
-    # tokenizer = load_tokenizer(model_path)
+
     
     edge_token_data, edge_token_violations, token_texts = None, None, None
     latent_token_data, latent_token_activations = None, None

@@ -132,7 +132,7 @@ def display_edge_inspector(data_array, original_texts, token_data=None, token_vi
     edge_stats = get_edge_violation_stats(data_array)
     
     with st.sidebar:
-        with st.expander("📊 Edge Violation Statistics", expanded=False):
+        with st.expander("Edge Violation Statistics", expanded=False):
             # Sort by violation count descending
             sorted_stats = edge_stats.sort_values('violation_count', ascending=False)
             
@@ -272,7 +272,7 @@ def display_edge_inspector(data_array, original_texts, token_data=None, token_vi
         
         # Add sliders for controlling display parameters
         with st.sidebar:
-            with st.expander("⚙️ Display Settings", expanded=False):
+            with st.expander("Display Settings", expanded=False):
                 display_count = st.slider("Number of tokens to display", min_value=1, max_value=50, value=15, step=5)
                 min_token_freq = st.slider("Minimum token frequency", min_value=0, max_value=200, value=50, step=1)
                 
