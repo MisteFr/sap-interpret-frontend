@@ -2,6 +2,8 @@
 
 An interactive Streamlit dashboard for exploring latent-space activations and Safety Polytope facet (edge) violations in language models.
 
+**Demo:** [https://sap.arthurbigot.fr/](https://sap.arthurbigot.fr/)
+
 ## Overview
 
 [Safety Polytope](https://github.com/lasgroup/SafetyPolytope/tree/main) (SaP) is a geometric safety layer that defines a set of half-space constraints ("facets") in the hidden-state representation space of a language model ([Learning Safety Constraints for Large Language Models](https://arxiv.org/abs/2505.24445) the technical details).  

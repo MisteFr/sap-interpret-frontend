@@ -135,7 +135,8 @@ This dashboard lets you inspect how data from the [BeaverTail](https://huggingfa
 • **Facet / Edge Violation Inspector** – identify inputs/logits that violate safety facets and drill down to token level.  
 • **Token-level Heat-maps** – see which tokens contribute most to each violation.
 
-Made as a part of a semester research project by [Arthur Bigot](https://github.com/MisteFr).
+Made as a part of a semester research project by [Arthur Bigot](https://github.com/MisteFr).  
+A project report is coming soon.
         """
     )
     
@@ -299,6 +300,16 @@ Made as a part of a semester research project by [Arthur Bigot](https://github.c
                 display_edge_correlation_analyzer(data_array)
         else:
             st.info("Edge correlation analysis is only available in Edge Violation Inspection mode.")
+
+    # -----------------------------------------------------------------
+    # Custom footer (source code link & report notice)
+    # -----------------------------------------------------------------
+    st.markdown(
+        """
+---
+View the source code on [GitHub](https://github.com/MisteFr/sap-interpret-frontend)  """,
+        unsafe_allow_html=True,
+    )
 
 if __name__ == "__main__":
     main() 
