@@ -147,9 +147,9 @@ A project report is coming soon.
         index=1
     )
     
-    tabs = st.tabs(["Settings", "Explorer", "Token Analysis", "Sample Edge Analysis", "Edge Correlation"])
+    tabs = st.tabs(["Explorer", "Token Analysis", "Sample Edge Analysis", "Edge Correlation", "Settings"])
     
-    with tabs[0]:  # Settings tab
+    with tabs[4]:  # Settings tab
         st.header("Data Settings")
         
         # Get available files
@@ -263,7 +263,7 @@ A project report is coming soon.
             **BeaverTail Dataset**: Contains examples from terrorism category for safety analysis
             """)
     
-    with tabs[1]:  # Explorer tab
+    with tabs[0]:  # Explorer tab
         if mode == "Latent Inspection":
             display_latent_inspector(
                 data_array, 
@@ -279,7 +279,7 @@ A project report is coming soon.
                 token_violations=edge_token_violations
             )
     
-    with tabs[2]:  # Token Analysis tab
+    with tabs[1]:  # Token Analysis tab
         if mode == "Edge Violation Inspection":
             if edge_token_data is None:
                 st.warning("No token-level violation data loaded.")
@@ -300,7 +300,7 @@ A project report is coming soon.
                     original_texts=original_texts
                 )
     
-    with tabs[3]:  # Sample Edge Analysis tab
+    with tabs[2]:  # Sample Edge Analysis tab
         if mode == "Edge Violation Inspection":
             if data_array is None:
                 st.warning("No edge violation data loaded.")
@@ -312,7 +312,7 @@ A project report is coming soon.
         else:
             st.info("Sample edge analysis is only available in Edge Violation Inspection mode.")
 
-    with tabs[4]:  # Edge Correlation tab
+    with tabs[3]:  # Edge Correlation tab
         if mode == "Edge Violation Inspection":
             if data_array is None:
                 st.warning("No edge violation data loaded.")
