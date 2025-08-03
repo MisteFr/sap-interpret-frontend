@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import numpy as np
 from data.loader import load_data, load_token_level_data
 from visualization.latent_inspector import display_latent_inspector
 from visualization.edge_inspector import display_edge_inspector
@@ -146,9 +147,9 @@ A project report is coming soon.
         index=1
     )
     
-    tabs = st.tabs(["Explorer", "Token Analysis", "Sample Edge Analysis", "Edge Correlation", "Settings"])
+    tabs = st.tabs(["Settings", "Explorer", "Token Analysis", "Sample Edge Analysis", "Edge Correlation"])
     
-    with tabs[4]:  # Settings tab
+    with tabs[0]:  # Settings tab
         st.header("Data Settings")
         
         # Get available files
@@ -243,7 +244,26 @@ A project report is coming soon.
     
     st.sidebar.write(f"Dataset contains {data_array.shape[0]} samples")
     
-    with tabs[0]:  # Explorer tab
+    with st.sidebar:
+        with st.expander("Help", expanded=False):
+            st.markdown("""
+            **Key Concepts:**
+            - **Edge/Facet**: Safety constraint boundary that defines safe vs unsafe content
+            - **Violation**: When text crosses a safety boundary (positive scores = potentially unsafe)
+            - **Latent Dimension**: Hidden features the AI model learned to recognize
+            - **Positive Logits**: Tokens that contribute to safety violations
+            - **Negative Logits**: Tokens that indicate safe content
+            - **Activation**: How strongly a feature responds to input text
+            
+            **Score Interpretation:**
+            - **Higher positive values** = stronger unsafe signal
+            - **Higher negative values** = stronger safe signal
+            - **Values near zero** = neutral/ambiguous content
+            
+            **BeaverTail Dataset**: Contains examples from terrorism category for safety analysis
+            """)
+    
+    with tabs[1]:  # Explorer tab
         if mode == "Latent Inspection":
             display_latent_inspector(
                 data_array, 
@@ -259,7 +279,7 @@ A project report is coming soon.
                 token_violations=edge_token_violations
             )
     
-    with tabs[1]:  # Token Analysis tab
+    with tabs[2]:  # Token Analysis tab
         if mode == "Edge Violation Inspection":
             if edge_token_data is None:
                 st.warning("No token-level violation data loaded.")
@@ -280,7 +300,7 @@ A project report is coming soon.
                     original_texts=original_texts
                 )
     
-    with tabs[2]:  # Sample Edge Analysis tab
+    with tabs[3]:  # Sample Edge Analysis tab
         if mode == "Edge Violation Inspection":
             if data_array is None:
                 st.warning("No edge violation data loaded.")
@@ -292,7 +312,7 @@ A project report is coming soon.
         else:
             st.info("Sample edge analysis is only available in Edge Violation Inspection mode.")
 
-    with tabs[3]:  # Edge Correlation tab
+    with tabs[4]:  # Edge Correlation tab
         if mode == "Edge Violation Inspection":
             if data_array is None:
                 st.warning("No edge violation data loaded.")
